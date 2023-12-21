@@ -1,19 +1,19 @@
 #ifndef clox_value_h
-#define clox_value_h
+#define clox_value_h 1
 
 #include "common.h"
 
-typedef double Value;
+typedef double value_t;
 
 typedef struct {
     int capacity;
     int count;
-    Value* values;
-} ValueArray;
+    value_t* values;
+} value_array_t;
 
-void initValueArray(ValueArray* array);
-void writeValueArray(ValueArray* array, Value value);
-void freeValueArray(ValueArray* array);
-void printValue(Value value);
+void init_value_array(value_array_t* array);
+void write_value_array(value_array_t* array, value_t value);
+void free_value_array(value_array_t* array);
+void print_value(value_t value);
 
 #endif

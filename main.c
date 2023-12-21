@@ -1,20 +1,24 @@
 #include "common.h"
 #include "chunk.h"
 #include "debug.h"
+#include "vm.h"
 
 int main() {
-    Chunk chunk;
+    init_vm();
+    chunk_t chunk;
 
-    initChunk(&chunk);
+    init_chunk(&chunk);
 
-    int constant = addConstant(&chunk, 1.2);
-    writeChunk(&chunk, OP_CONSTANT, 123);
-    writeChunk(&chunk, constant,123);
+    int constant = add_constant(&chunk, 1.2);
+    write_chunk(&chunk, OP_CONSTANT, 123);
+    write_chunk(&chunk, constant, 123);
 
-    writeChunk(&chunk, OP_RETURN, 123);
-    
-    disassembleChunk(&chunk, "test chunk");
-    freeChunk(&chunk);
+    write_chunk(&chunk, OP_RETURN, 123);
+
+    disassemble_chunk(&chunk, "test chunk");
+    interpret(&chunk);
+    free_vm();
+    free_chunk(&chunk);
 
     return EXIT_SUCCESS;
 }
