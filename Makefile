@@ -1,2 +1,2 @@
 all: main.c
-		gcc main.c chunk.c memory.c debug.c value.c vm.c -o ./dist/bin && ./dist/bin
+		gcc -Wall main.c chunk.c memory.c debug.c value.c vm.c compiler.c scanner.c -o ./dist/bin && ./dist/bin
