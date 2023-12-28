@@ -6,8 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// if you ask me, this should be defined in debug.h
-#define DEBUG_TRACE_EXECUTION 1
+//#define DEBUG_PRINT_CODE 1
+//#define DEBUG_TRACE_EXECUTION 1
 #define LINE_MAX 1024
 
 #endif

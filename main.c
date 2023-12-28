@@ -3,8 +3,8 @@
 #include <string.h>
 #include <sysexits.h>
 
-#include "common.h"
 #include "chunk.h"
+#include "common.h"
 #include "debug.h"
 #include "vm.h"
 
@@ -22,8 +22,8 @@ static void repl() {
     }
 }
 
-static char* read_file(const char* path) {
-    FILE* file = fopen(path, "rb");
+static char *read_file(const char *path) {
+    FILE *file = fopen(path, "rb");
     if (file == NULL) {
         fprintf(stderr, "Could not open file \"%s\".", path);
         exit(EX_IOERR);
@@ -33,7 +33,7 @@ static char* read_file(const char* path) {
     size_t file_size = ftell(file);
     rewind(file);
 
-    char* buffer = (char*)malloc(file_size + 1);
+    char *buffer = (char *)malloc(file_size + 1);
     if (buffer == NULL) {
         fprintf(stderr, "Not enough memory to read \"%s\".", path);
         exit(EX_IOERR);
@@ -49,8 +49,8 @@ static char* read_file(const char* path) {
     return buffer;
 }
 
-static void runFile(const char* path) {
-    char* source = read_file(path);
+static void runFile(const char *path) {
+    char *source = read_file(path);
     interpret_result_t result = interpret(source);
     free(source);
 
@@ -58,7 +58,7 @@ static void runFile(const char* path) {
     if (result == INTERPRET_RUNTIME_ERROR) exit(EX_SOFTWARE);
 }
 
-int main(int argc, const char* argv[]) {
+int main(int argc, const char *argv[]) {
     init_vm();
 
     if (argc == 1) {
@@ -73,4 +73,3 @@ int main(int argc, const char* argv[]) {
     free_vm();
     return EXIT_SUCCESS;
 }
-
