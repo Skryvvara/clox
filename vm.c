@@ -124,7 +124,7 @@ static interpret_result_t run() {
                 if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
                     concatenate();
                 } else {
-                    runtime_error("Operand must be two string.");
+                    runtime_error("Operand must be two strings.");
                     return INTERPRET_RUNTIME_ERROR;
                 }
                 break;
