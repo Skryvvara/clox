@@ -41,11 +41,11 @@ typedef struct {
 } parse_rule_t;
 
 parser_t parser;
-chunk_t *compiling_chunk;
+chunk_t* compiling_chunk;
 
-static chunk_t *current_chunk() { return compiling_chunk; }
+static chunk_t* current_chunk() { return compiling_chunk; }
 
-static void error_at(token_t *token, const char *message) {
+static void error_at(token_t* token, const char* message) {
     if (parser.panic_mode) return;
     parser.panic_mode = true;
     fprintf(stderr, "[line %d] Error", token->line);
@@ -62,9 +62,9 @@ static void error_at(token_t *token, const char *message) {
     parser.had_error = true;
 }
 
-static void error(const char *message) { error_at(&parser.previous, message); }
+static void error(const char* message) { error_at(&parser.previous, message); }
 
-static void error_at_current(const char *message) {
+static void error_at_current(const char* message) {
     error_at(&parser.current, message);
 }
 
@@ -79,7 +79,7 @@ static void advance() {
     }
 }
 
-static void consume(token_type_t type, const char *message) {
+static void consume(token_type_t type, const char* message) {
     if (parser.current.type == type) {
         advance();
         return;
@@ -123,12 +123,12 @@ static void end_compiler() {
 }
 
 static void expression();
-static parse_rule_t *get_rule(token_type_t type);
+static parse_rule_t* get_rule(token_type_t type);
 static void parse_precedence(precedence_t precedence);
 
 static void binary() {
     token_type_t operator_type = parser.previous.type;
-    parse_rule_t *rule = get_rule(operator_type);
+    parse_rule_t* rule = get_rule(operator_type);
     parse_precedence((precedence_t)(rule->precedence + 1));
 
     switch (operator_type) {
@@ -152,6 +152,10 @@ static void binary() {
             break;
         case TOKEN_PLUS: {
             emit_byte(OP_ADD);
+            break;
+        }
+        case TOKEN_DOT_DOT: {
+            emit_byte(OP_ADD_STR);
             break;
         }
         case TOKEN_MINUS: {
@@ -197,6 +201,11 @@ static void number() {
     emit_constant(NUMBER_VAL(value));
 }
 
+static void string() {
+    emit_constant(OBJECT_VAL(
+        copy_string(parser.previous.start + 1, parser.previous.length - 2)));
+}
+
 static void expression() { parse_precedence(PREC_ASSIGNMENT); }
 
 static void unary() {
@@ -225,6 +234,7 @@ parse_rule_t rules[] = {
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, NULL, PREC_CALL},
+    [TOKEN_DOT_DOT] = {NULL, binary, PREC_TERM},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
@@ -239,7 +249,7 @@ parse_rule_t rules[] = {
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
-    [TOKEN_STRING] = {NULL, NULL, PREC_NONE},
+    [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER] = {number, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, NULL, PREC_AND},
     [TOKEN_CLASS] = {NULL, NULL, PREC_NONE},
@@ -278,9 +288,9 @@ static void parse_precedence(precedence_t precedence) {
     }
 }
 
-static parse_rule_t *get_rule(token_type_t type) { return &rules[type]; }
+static parse_rule_t* get_rule(token_type_t type) { return &rules[type]; }
 
-bool compile(const char *source, chunk_t *chunk) {
+bool compile(const char* source, chunk_t* chunk) {
     parser.had_error = false;
     init_scanner(source);
 

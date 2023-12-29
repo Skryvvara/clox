@@ -13,6 +13,7 @@ typedef enum {
     OP_GREATER,
     OP_LESS,
     OP_ADD,
+    OP_ADD_STR,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,

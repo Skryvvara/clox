@@ -2,10 +2,13 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 #include "compiler.h"
 #include "debug.h"
+#include "memory.h"
+#include "object.h"
 
 vm_t vm;
 
@@ -24,9 +27,12 @@ static void runtime_error(const char* format, ...) {
     reset_stack();
 }
 
-void init_vm() { reset_stack(); }
+void init_vm() {
+    reset_stack();
+    vm.objects = NULL;
+}
 
-void free_vm() {}
+void free_vm() { free_objects(); }
 
 void push(value_t value) {
     *vm.stack_top = value;
@@ -42,6 +48,19 @@ static value_t peek(int distance) { return vm.stack_top[-1 - distance]; }
 
 static bool is_falsey(value_t value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
+static void concatenate() {
+    object_string_t* b = AS_STRING(pop());
+    object_string_t* a = AS_STRING(pop());
+    int length = a->length + b->length;
+    char* chars = ALLOCATE(char, length + 1);
+    memcpy(chars, a->chars, a->length);
+    memcpy(chars + a->length, b->chars, b->length);
+    chars[length] = '\0';
+
+    object_string_t* result = take_string(chars, length);
+    push(OBJECT_VAL(result));
 }
 
 static interpret_result_t run() {
@@ -87,9 +106,29 @@ static interpret_result_t run() {
             case OP_LESS:
                 BINARY_OP(BOOL_VAL, <);
                 break;
-            case OP_ADD:
-                BINARY_OP(NUMBER_VAL, +);
+            case OP_ADD: {
+                if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+                    concatenate();
+                } else if (IS_NUMBER(peek(0)) && IS_NUMBER(peek(1))) {
+                    double b = AS_NUMBER(pop());
+                    double a = AS_NUMBER(pop());
+                    push(NUMBER_VAL(a + b));
+                } else {
+                    runtime_error(
+                        "Operands must be two numbers or two strings.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
                 break;
+            }
+            case OP_ADD_STR: {
+                if (IS_STRING(peek(0)) && IS_STRING(peek(1))) {
+                    concatenate();
+                } else {
+                    runtime_error("Operand must be two string.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_SUBTRACT:
                 BINARY_OP(NUMBER_VAL, -);
                 break;
