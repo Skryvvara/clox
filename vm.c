@@ -30,6 +30,7 @@ static void runtime_error(const char* format, ...) {
 void init_vm() {
     reset_stack();
     vm.objects = NULL;
+    init_table(&vm.strings);
 }
 
 void free_vm() { free_objects(); }
