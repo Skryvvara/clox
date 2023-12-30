@@ -22,7 +22,7 @@ void free_table(table_t* table) {
 
 static entry_t* find_entry(entry_t* entries, int capacity,
                            object_string_t* key) {
-    uint32_t index = key->hash & capacity;
+    uint32_t index = key->hash & (capacity-1);
     entry_t* tombstone = NULL;
     for (;;) {
         entry_t* entry = &entries[index];

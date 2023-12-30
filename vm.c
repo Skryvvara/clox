@@ -30,10 +30,15 @@ static void runtime_error(const char* format, ...) {
 void init_vm() {
     reset_stack();
     vm.objects = NULL;
+    init_table(&vm.globals);
     init_table(&vm.strings);
 }
 
-void free_vm() { free_objects(); }
+void free_vm() {
+    free_objects();
+    free_table(&vm.globals);
+    free_table(&vm.strings);
+}
 
 void push(value_t value) {
     *vm.stack_top = value;
@@ -67,6 +72,7 @@ static void concatenate() {
 static interpret_result_t run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                         \
     do {                                                  \
         if (!IS_NUMBER(peek(0)) || !IS_NUMBER(peek(1))) { \
@@ -95,6 +101,34 @@ static interpret_result_t run() {
             case OP_FALSE:
                 push(BOOL_VAL(false));
                 break;
+            case OP_POP:
+                pop();
+                break;
+            case OP_GET_GLOBAL: {
+                object_string_t* name = READ_STRING();
+                value_t value;
+                if (!table_get(&vm.globals, name, &value)) {
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                push(value);
+                break;
+            }
+            case OP_DEFINE_GLOBAL: {
+                object_string_t* name = READ_STRING();
+                table_set(&vm.globals, name, peek(0));
+                pop();
+                break;
+            }
+            case OP_SET_GLOBAL: {
+                object_string_t* name = READ_STRING();
+                if (table_set(&vm.globals, name, peek(0))) {
+                    table_delete(&vm.globals, name);
+                    runtime_error("Undefined variable '%s'.", name->chars);
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = pop();
                 value_t a = pop();
@@ -149,9 +183,11 @@ static interpret_result_t run() {
                 }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
-            case OP_RETURN:
+            case OP_PRINT:
                 print_value(pop());
                 printf("\n");
+                break;
+            case OP_RETURN:
                 return INTERPRET_OK;
         }
     }
@@ -169,6 +205,7 @@ static interpret_result_t run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRIN
 #undef BINARY_OP
 }
 
