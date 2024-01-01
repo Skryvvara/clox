@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "common.h"
 #include "compiler.h"
@@ -12,7 +13,32 @@
 
 vm_t vm;
 
-void reset_stack() { vm.stack_top = vm.stack; }
+static void runtime_error(const char* format, ...);
+
+static value_t clock_native(int arg_count, value_t* args) {
+    return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
+}
+
+static value_t strlen_native(int arg_count, value_t* args) {
+    if (IS_STRING(args[0])) {
+        return NUMBER_VAL(strlen(AS_CSTRING(args[0])));
+    } else {
+        return NUMBER_VAL(0);
+    }
+}
+
+static value_t is_string_native(int arg_count, value_t* args) {
+    if (IS_STRING(args[0])) {
+        return BOOL_VAL(true);
+    } else {
+        return BOOL_VAL(false);
+    }
+}
+
+void reset_stack() {
+    vm.stack_top = vm.stack;
+    vm.frame_count = 0;
+}
 
 static void runtime_error(const char* format, ...) {
     va_list args;
@@ -21,10 +47,27 @@ static void runtime_error(const char* format, ...) {
     va_end(args);
     fputs("\n", stderr);
 
-    size_t instruction = vm.ip - vm.chunk->code - 1;
-    int line = vm.chunk->lines[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
+    for (int i = vm.frame_count - 1; i >= 0; i--) {
+        call_frame_t* frame = &vm.frames[i];
+        object_function_t* function = frame->function;
+        size_t instruction = frame->ip - function->chunk.code - 1;
+        fprintf(stderr, "[line %d] in ", function->chunk.lines[instruction]);
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->chars);
+        }
+    }
+
     reset_stack();
+}
+
+static void define_native(const char* name, native_fn_t function, int arity) {
+    push(OBJECT_VAL(copy_string(name, (int)strlen(name))));
+    push(OBJECT_VAL(new_native(function, arity)));
+    table_set(&vm.globals, AS_STRING(vm.stack[0]), vm.stack[1]);
+    pop();
+    pop();
 }
 
 void init_vm() {
@@ -32,6 +75,11 @@ void init_vm() {
     vm.objects = NULL;
     init_table(&vm.globals);
     init_table(&vm.strings);
+
+    // native functions
+    define_native("clock", clock_native, 0);
+    define_native("strlen", strlen_native, 1);
+    define_native("is_string", is_string_native, 1);
 }
 
 void free_vm() {
@@ -52,6 +100,52 @@ value_t pop() {
 
 static value_t peek(int distance) { return vm.stack_top[-1 - distance]; }
 
+static bool call(object_function_t* function, int arg_count) {
+    if (arg_count != function->arity) {
+        runtime_error("Expected %d argument(s) but got %d.", function->arity,
+                      arg_count);
+        return false;
+    }
+
+    if (vm.frame_count == FRAMES_MAX) {
+        runtime_error("Stack overflow.");
+        return false;
+    }
+
+    call_frame_t* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack_top - arg_count - 1;
+    return true;
+}
+
+static bool call_value(value_t callee, int arg_count) {
+    if (IS_OBJECT(callee)) {
+        switch (OBJECT_TYPE(callee)) {
+            case OBJECT_FUNCTION:
+                return call(AS_FUNCTION(callee), arg_count);
+            case OBJECT_NATIVE: {
+                object_native_t* native = AS_NATIVE_OBJECT(callee);
+
+                if (arg_count != native->arity) {
+                    runtime_error("Expected %d argument(s) but got %d.",
+                                  native->arity, arg_count);
+                    return false;
+                }
+
+                value_t result = native->function(arg_count, vm.stack_top - arg_count);
+                vm.stack_top -= arg_count + 1;
+                push(result);
+                return true;
+            }
+            default:
+                break;
+        }
+    }
+    runtime_error("Can only call functions and classes.");
+    return false;
+}
+
 static bool is_falsey(value_t value) {
     return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
 }
@@ -70,8 +164,12 @@ static void concatenate() {
 }
 
 static interpret_result_t run() {
-#define READ_BYTE() (*vm.ip++)
-#define READ_CONSTANT() (vm.chunk->constants.values[READ_BYTE()])
+    call_frame_t* frame = &vm.frames[vm.frame_count - 1];
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() \
+    (frame->ip += 2, (uint16_t)(frame->ip[-2] << 8) | frame->ip[-1])
+#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 #define BINARY_OP(value_type, op)                         \
     do {                                                  \
@@ -104,6 +202,24 @@ static interpret_result_t run() {
             case OP_POP:
                 pop();
                 break;
+            case OP_POPN: {
+                int n = AS_NUMBER(pop());
+                while (n > 0) {
+                    pop();
+                    n--;
+                }
+                break;
+            }
+            case OP_GET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                push(frame->slots[slot]);
+                break;
+            }
+            case OP_SET_LOCAL: {
+                uint8_t slot = READ_BYTE();
+                frame->slots[slot] = peek(0);
+                break;
+            }
             case OP_GET_GLOBAL: {
                 object_string_t* name = READ_STRING();
                 value_t value;
@@ -187,8 +303,42 @@ static interpret_result_t run() {
                 print_value(pop());
                 printf("\n");
                 break;
-            case OP_RETURN:
-                return INTERPRET_OK;
+            case OP_JUMP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip += offset;
+                break;
+            }
+            case OP_JUMP_IF_FALSE: {
+                uint16_t offset = READ_SHORT();
+                if (is_falsey(peek(0))) frame->ip += offset;
+                break;
+            }
+            case OP_LOOP: {
+                uint16_t offset = READ_SHORT();
+                frame->ip -= offset;
+                break;
+            }
+            case OP_CALL: {
+                int arg_count = READ_BYTE();
+                if (!call_value(peek(arg_count), arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
+            case OP_RETURN: {
+                value_t result = pop();
+                vm.frame_count--;
+                if (vm.frame_count == 0) {
+                    pop();
+                    return INTERPRET_OK;
+                }
+
+                vm.stack_top = frame->slots;
+                push(result);
+                frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
         }
     }
 
@@ -200,28 +350,23 @@ static interpret_result_t run() {
         printf(" ]");
     }
     printf("\n");
-    disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+    disassemble_instruction(&frame->function->chunk,
+                            (int)(frame->ip - frame->function->chunk.code));
 #endif
 
 #undef READ_BYTE
+#undef READ_SHORT
 #undef READ_CONSTANT
 #undef READ_STRIN
 #undef BINARY_OP
 }
 
 interpret_result_t interpret(const char* source) {
-    chunk_t chunk;
-    init_chunk(&chunk);
+    object_function_t* function = compile(source);
+    if (function == NULL) return INTERPRET_COMPILE_ERROR;
 
-    if (!compile(source, &chunk)) {
-        free_chunk(&chunk);
-        return INTERPRET_COMPILE_ERROR;
-    }
+    push(OBJECT_VAL(function));
+    call(function, 0);
 
-    vm.chunk = &chunk;
-    vm.ip = vm.chunk->code;
-
-    interpret_result_t result = run();
-    free_chunk(&chunk);
-    return result;
+    return run();
 }

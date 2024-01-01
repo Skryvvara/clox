@@ -19,6 +19,22 @@ static object_t* allocate_object(size_t size, object_type_t type) {
     return object;
 }
 
+object_function_t* new_function() {
+    object_function_t* function =
+        ALLOCATE_OBJECT(object_function_t, OBJECT_FUNCTION);
+    function->arity = 0;
+    function->name = NULL;
+    init_chunk(&function->chunk);
+    return function;
+}
+
+object_native_t* new_native(native_fn_t function, int arity) {
+    object_native_t* native = ALLOCATE_OBJECT(object_native_t, OBJECT_NATIVE);
+    native->arity = arity;
+    native->function = function;
+    return native;
+}
+
 static object_string_t* allocate_string(char* chars, int length,
                                         uint32_t hash) {
     object_string_t* string = ALLOCATE_OBJECT(object_string_t, OBJECT_STRING);
@@ -40,10 +56,11 @@ static uint32_t hash_string(const char* key, int length) {
 
 object_string_t* take_string(char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
-    object_string_t* interned = table_find_string(&vm.strings, chars, length, hash);
+    object_string_t* interned =
+        table_find_string(&vm.strings, chars, length, hash);
 
     if (interned != NULL) {
-        FREE_ARRAY(char, chars, length+1);
+        FREE_ARRAY(char, chars, length + 1);
         return interned;
     }
 
@@ -52,7 +69,8 @@ object_string_t* take_string(char* chars, int length) {
 
 object_string_t* copy_string(const char* chars, int length) {
     uint32_t hash = hash_string(chars, length);
-    object_string_t* interned = table_find_string(&vm.strings, chars, length, hash);
+    object_string_t* interned =
+        table_find_string(&vm.strings, chars, length, hash);
 
     if (interned != NULL) return interned;
 
@@ -62,8 +80,22 @@ object_string_t* copy_string(const char* chars, int length) {
     return allocate_string(heap_chars, length, hash);
 }
 
+static void print_function(object_function_t* function) {
+    if (function->name == NULL) {
+        printf("<script>");
+        return;
+    }
+    printf("<fn %s>", function->name->chars);
+}
+
 void print_object(value_t value) {
     switch (OBJECT_TYPE(value)) {
+        case OBJECT_FUNCTION:
+            print_function(AS_FUNCTION(value));
+            break;
+        case OBJECT_NATIVE:
+            printf("<native fn>");
+            break;
         case OBJECT_STRING:
             printf("%s", AS_CSTRING(value));
             break;

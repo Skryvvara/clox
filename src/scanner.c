@@ -107,6 +107,8 @@ static token_type_t identifier_type() {
             return check_keyword(1, 2, "nd", TOKEN_AND);
         case 'c':
             return check_keyword(1, 4, "lass", TOKEN_CLASS);
+        case 'd':
+            return check_keyword(1, 1, "o", TOKEN_DO);
         case 'e':
             return check_keyword(1, 3, "lse", TOKEN_ELSE);
         case 'f': {
@@ -138,7 +140,14 @@ static token_type_t identifier_type() {
             if (scanner.current - scanner.start > 1) {
                 switch (scanner.start[1]) {
                     case 'h':
-                        return check_keyword(2, 2, "is", TOKEN_THIS);
+                        if (scanner.current - scanner.start > 2) {
+                            switch (scanner.start[2]) {
+                                case 'i':
+                                    return check_keyword(3, 1, "s", TOKEN_THIS);
+                                case 'e':
+                                    return check_keyword(3, 1, "n", TOKEN_THEN);
+                            }
+                        }
                     case 'r':
                         return check_keyword(2, 2, "ue", TOKEN_TRUE);
                 }
