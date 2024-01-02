@@ -19,13 +19,20 @@ void* reallocate(void* pointer, size_t old_size, size_t new_size) {
 
 void free_object(object_t* object) {
     switch (object->type) {
+        case OBJECT_CLOSURE: {
+            object_closure_t* closure = (object_closure_t*)object;
+            FREE_ARRAY(object_upvalue_t*, closure->upvalues,
+                       closure->upvalue_count);
+            FREE(object_closure_t, object);
+            break;
+        }
         case OBJECT_FUNCTION: {
             object_function_t* function = (object_function_t*)object;
             free_chunk(&function->chunk);
             FREE(object_function_t, object);
             break;
         }
-        case OBJECT_NATIVE: 
+        case OBJECT_NATIVE:
             FREE(object_native_t, object);
             break;
         case OBJECT_STRING: {
@@ -34,6 +41,9 @@ void free_object(object_t* object) {
             FREE(object_string_t, object);
             break;
         }
+        case OBJECT_UPVALUE:
+            FREE(object_upvalue_t, object);
+            break;
     }
 }
 
