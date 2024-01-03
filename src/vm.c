@@ -75,6 +75,14 @@ static void define_native(const char* name, native_fn_t function, int arity) {
 void init_vm() {
     reset_stack();
     vm.objects = NULL;
+
+    vm.bytes_allocated = 0;
+    vm.next_gc = GC_INIT_TRESHOLD;
+
+    vm.gray_count = 0;
+    vm.gray_capacity = 0;
+    vm.gray_stack = NULL;
+
     init_table(&vm.globals);
     init_table(&vm.strings);
 
@@ -85,9 +93,9 @@ void init_vm() {
 }
 
 void free_vm() {
-    free_objects();
     free_table(&vm.globals);
     free_table(&vm.strings);
+    free_objects();
 }
 
 void push(value_t value) {
@@ -187,8 +195,8 @@ static bool is_falsey(value_t value) {
 }
 
 static void concatenate() {
-    object_string_t* b = AS_STRING(pop());
-    object_string_t* a = AS_STRING(pop());
+    object_string_t* b = AS_STRING(peek(0));
+    object_string_t* a = AS_STRING(peek(1));
     int length = a->length + b->length;
     char* chars = ALLOCATE(char, length + 1);
     memcpy(chars, a->chars, a->length);
@@ -196,6 +204,9 @@ static void concatenate() {
     chars[length] = '\0';
 
     object_string_t* result = take_string(chars, length);
+    pop();
+    pop();
+
     push(OBJECT_VAL(result));
 }
 
