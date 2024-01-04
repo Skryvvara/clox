@@ -1,27 +1,34 @@
 #ifndef clox_object_h
 #define clox_object_h 1
 
-#include "common.h"
 #include "chunk.h"
+#include "common.h"
+#include "table.h"
 #include "value.h"
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 
+#define IS_CLASS(value) is_object_type(value, OBJECT_CLASS)
 #define IS_CLOSURE(value) is_object_type(value, OBJECT_CLOSURE)
 #define IS_FUNCTION(value) is_object_type(value, OBJECT_FUNCTION)
+#define IS_INSTANCE(value) is_object_type(value, OBJECT_INSTANCE)
 #define IS_NATIVE(value) is_object_type(value, OBJECT_NATIVE)
 #define IS_STRING(value) is_object_type(value, OBJECT_STRING)
 
+#define AS_CLASS(value) ((object_class_t*)AS_OBJECT(value))
 #define AS_CLOSURE(value) ((object_closure_t*)AS_OBJECT(value))
 #define AS_FUNCTION(value) ((object_function_t*)AS_OBJECT(value))
+#define AS_INSTANCE(value) ((object_instance_t*)AS_OBJECT(value))
 #define AS_NATIVE_OBJECT(value) ((object_native_t*)AS_OBJECT(value))
 #define AS_NATIVE(value) (((object_native_t*)AS_OBJECT(value))->function)
 #define AS_STRING(value) ((object_string_t*)AS_OBJECT(value))
 #define AS_CSTRING(value) (((object_string_t*)AS_OBJECT(value))->chars)
 
 typedef enum {
+    OBJECT_CLASS,
     OBJECT_CLOSURE,
     OBJECT_FUNCTION,
+    OBJECT_INSTANCE,
     OBJECT_NATIVE,
     OBJECT_STRING,
     OBJECT_UPVALUE,
@@ -70,8 +77,21 @@ typedef struct {
     int upvalue_count;
 } object_closure_t;
 
+typedef struct {
+    object_t object;
+    object_string_t* name;
+} object_class_t;
+
+typedef struct {
+    object_t object;
+    object_class_t* klass;
+    table_t fields;
+} object_instance_t;
+
+object_class_t* new_class(object_string_t* name);
 object_closure_t* new_closure(object_function_t* function);
 object_function_t* new_function();
+object_instance_t* new_instance(object_class_t* klass);
 object_native_t* new_native(native_fn_t function, int arity);
 object_string_t* take_string(char* chars, int length);
 object_string_t* copy_string(const char* chars, int length);

@@ -26,6 +26,12 @@ static object_t* allocate_object(size_t size, object_type_t type) {
     return object;
 }
 
+object_class_t* new_class(object_string_t* name) {
+    object_class_t* klass = ALLOCATE_OBJECT(object_class_t, OBJECT_CLASS);
+    klass->name = name;
+    return klass;
+}
+
 object_closure_t* new_closure(object_function_t* function) {
     object_upvalue_t** upvalues =
         ALLOCATE(object_upvalue_t*, function->upvalue_count);
@@ -49,6 +55,14 @@ object_function_t* new_function() {
     function->name = NULL;
     init_chunk(&function->chunk);
     return function;
+}
+
+object_instance_t* new_instance(object_class_t* klass) {
+    object_instance_t* instance =
+        ALLOCATE_OBJECT(object_instance_t, OBJECT_INSTANCE);
+    instance->klass = klass;
+    init_table(&instance->fields);
+    return instance;
 }
 
 object_native_t* new_native(native_fn_t function, int arity) {
@@ -107,7 +121,8 @@ object_string_t* copy_string(const char* chars, int length) {
 }
 
 object_upvalue_t* new_upvalue(value_t* slot) {
-    object_upvalue_t* upvalue = ALLOCATE_OBJECT(object_upvalue_t, OBJECT_UPVALUE);
+    object_upvalue_t* upvalue =
+        ALLOCATE_OBJECT(object_upvalue_t, OBJECT_UPVALUE);
     upvalue->closed = NIL_VAL;
     upvalue->location = slot;
     upvalue->next = NULL;
@@ -124,11 +139,17 @@ static void print_function(object_function_t* function) {
 
 void print_object(value_t value) {
     switch (OBJECT_TYPE(value)) {
+        case OBJECT_CLASS:
+            printf("%s", AS_CLASS(value)->name->chars);
+            break;
         case OBJECT_CLOSURE:
             print_function(AS_CLOSURE(value)->function);
             break;
         case OBJECT_FUNCTION:
             print_function(AS_FUNCTION(value));
+            break;
+        case OBJECT_INSTANCE:
+            printf("%s instance", AS_INSTANCE(value)->klass->name->chars);
             break;
         case OBJECT_NATIVE:
             printf("<native fn>");

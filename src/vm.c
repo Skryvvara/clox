@@ -36,6 +36,21 @@ static value_t is_string_native(int arg_count, value_t* args) {
     }
 }
 
+static value_t has_own(int arg_count, value_t* args) {
+    if (IS_INSTANCE(args[0]) && IS_STRING(args[1])) {
+        object_instance_t* instance = AS_INSTANCE(args[0]);
+        object_string_t* name = AS_STRING(args[1]);
+        value_t value;
+        if (table_get(&instance->fields, name, &value)) {
+            return BOOL_VAL(true);
+        } else {
+            return BOOL_VAL(false);
+        }
+    } else {
+        return BOOL_VAL(false);
+    }
+}
+
 void reset_stack() {
     vm.stack_top = vm.stack;
     vm.frame_count = 0;
@@ -90,6 +105,7 @@ void init_vm() {
     define_native("clock", clock_native, 0);
     define_native("strlen", strlen_native, 1);
     define_native("is_string", is_string_native, 1);
+    define_native("has_own", has_own, 2);
 }
 
 void free_vm() {
@@ -132,6 +148,11 @@ static bool call(object_closure_t* closure, int arg_count) {
 static bool call_value(value_t callee, int arg_count) {
     if (IS_OBJECT(callee)) {
         switch (OBJECT_TYPE(callee)) {
+            case OBJECT_CLASS: {
+                object_class_t* klass = AS_CLASS(callee);
+                vm.stack_top[-arg_count - 1] = OBJECT_VAL(new_instance(klass));
+                return true;
+            }
             case OBJECT_CLOSURE:
                 return call(AS_CLOSURE(callee), arg_count);
             case OBJECT_NATIVE: {
@@ -303,6 +324,40 @@ static interpret_result_t run() {
                 *frame->closure->upvalues[slot]->location = peek(0);
                 break;
             }
+            case OP_GET_PROPERTY: {
+                if (!IS_INSTANCE(peek(0))) {
+                    runtime_error("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                object_instance_t* instance = AS_INSTANCE(peek(0));
+                object_string_t* name = READ_STRING();
+
+                value_t value;
+                if (table_get(&instance->fields, name, &value)) {
+                    pop();
+                    push(value);
+                } else {
+                    pop();
+                    push(NIL_VAL);
+                }
+
+                break;
+            }
+            case OP_SET_PROPERTY: {
+                if (!IS_INSTANCE(peek(1))) {
+                    runtime_error("Only instances have properties.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                object_instance_t* instance = AS_INSTANCE(peek(1));
+                table_set(&instance->fields, READ_STRING(), peek(0));
+                value_t value = pop();
+                pop();
+                push(value);
+
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = pop();
                 value_t a = pop();
@@ -418,6 +473,9 @@ static interpret_result_t run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_CLASS:
+                push(OBJECT_VAL(new_class(READ_STRING())));
+                break;
         }
     }
 
