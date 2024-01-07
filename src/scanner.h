@@ -35,4 +35,3 @@ void init_scanner(const char* source);
 token_t scan_token();
 
 #endif
-
