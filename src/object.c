@@ -26,9 +26,20 @@ static object_t* allocate_object(size_t size, object_type_t type) {
     return object;
 }
 
+object_bound_method_t* new_bound_method(value_t receiver,
+                                        object_closure_t* method) {
+    object_bound_method_t* bound =
+        ALLOCATE_OBJECT(object_bound_method_t, OBJECT_BOUND_METHOD);
+
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
 object_class_t* new_class(object_string_t* name) {
     object_class_t* klass = ALLOCATE_OBJECT(object_class_t, OBJECT_CLASS);
     klass->name = name;
+    init_table(&klass->methods);
     return klass;
 }
 
@@ -139,6 +150,9 @@ static void print_function(object_function_t* function) {
 
 void print_object(value_t value) {
     switch (OBJECT_TYPE(value)) {
+        case OBJECT_BOUND_METHOD:
+            print_function(AS_BOUND_METHOD(value)->method->function);
+            break;
         case OBJECT_CLASS:
             printf("%s", AS_CLASS(value)->name->chars);
             break;

@@ -8,6 +8,7 @@
 
 #define OBJECT_TYPE(value) (AS_OBJECT(value)->type)
 
+#define IS_BOUND_METHOD(value) is_object_type(value, OBJECT_BOUND_METHOD)
 #define IS_CLASS(value) is_object_type(value, OBJECT_CLASS)
 #define IS_CLOSURE(value) is_object_type(value, OBJECT_CLOSURE)
 #define IS_FUNCTION(value) is_object_type(value, OBJECT_FUNCTION)
@@ -15,6 +16,7 @@
 #define IS_NATIVE(value) is_object_type(value, OBJECT_NATIVE)
 #define IS_STRING(value) is_object_type(value, OBJECT_STRING)
 
+#define AS_BOUND_METHOD(value) ((object_bound_method_t*)AS_OBJECT(value))
 #define AS_CLASS(value) ((object_class_t*)AS_OBJECT(value))
 #define AS_CLOSURE(value) ((object_closure_t*)AS_OBJECT(value))
 #define AS_FUNCTION(value) ((object_function_t*)AS_OBJECT(value))
@@ -25,6 +27,7 @@
 #define AS_CSTRING(value) (((object_string_t*)AS_OBJECT(value))->chars)
 
 typedef enum {
+    OBJECT_BOUND_METHOD,
     OBJECT_CLASS,
     OBJECT_CLOSURE,
     OBJECT_FUNCTION,
@@ -80,6 +83,7 @@ typedef struct {
 typedef struct {
     object_t object;
     object_string_t* name;
+    table_t methods;
 } object_class_t;
 
 typedef struct {
@@ -88,6 +92,14 @@ typedef struct {
     table_t fields;
 } object_instance_t;
 
+typedef struct {
+    object_t object;
+    value_t receiver;
+    object_closure_t* method;
+} object_bound_method_t;
+
+object_bound_method_t* new_bound_method(value_t receiver,
+                                        object_closure_t* method);
 object_class_t* new_class(object_string_t* name);
 object_closure_t* new_closure(object_function_t* function);
 object_function_t* new_function();
