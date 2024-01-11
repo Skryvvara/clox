@@ -426,6 +426,15 @@ static interpret_result_t run() {
 
                 break;
             }
+            case OP_GET_SUPER: {
+                object_string_t* name = READ_STRING();
+                object_class_t* superclass = AS_CLASS(pop());
+
+                if (!bind_method(superclass, name)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                break;
+            }
             case OP_EQUAL: {
                 value_t b = pop();
                 value_t a = pop();
@@ -516,6 +525,16 @@ static interpret_result_t run() {
                 frame = &vm.frames[vm.frame_count - 1];
                 break;
             }
+            case OP_SUPER_INVOKE: {
+                object_string_t* method = READ_STRING();
+                int arg_count = READ_BYTE();
+                object_class_t* superclass = AS_CLASS(pop());
+                if (!invoke_from_class(superclass, method, arg_count)) {
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+                frame = &vm.frames[vm.frame_count - 1];
+                break;
+            }
             case OP_CLOSURE: {
                 object_function_t* function = AS_FUNCTION(READ_CONSTANT());
                 object_closure_t* closure = new_closure(function);
@@ -553,6 +572,20 @@ static interpret_result_t run() {
             case OP_CLASS:
                 push(OBJECT_VAL(new_class(READ_STRING())));
                 break;
+            case OP_INHERIT: {
+                value_t superclass = peek(1);
+
+                if (!IS_CLASS(superclass)) {
+                    runtime_error("Superclass must be a class.");
+                    return INTERPRET_RUNTIME_ERROR;
+                }
+
+                object_class_t* subclass = AS_CLASS(peek(0));
+                table_add_all(&AS_CLASS(superclass)->methods,
+                              &subclass->methods);
+                pop();
+                break;
+            }
             case OP_METHOD:
                 define_method(READ_STRING());
                 break;
