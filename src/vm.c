@@ -51,6 +51,14 @@ static value_t has_own(int arg_count, value_t* args) {
     }
 }
 
+static value_t is_even_native(int arg_count, value_t* args) {
+    if (IS_NUMBER(args[0])) {
+        return BOOL_VAL(((int)AS_NUMBER(args[0]) % 2) == 0);
+    } else {
+        return BOOL_VAL(false);
+    }
+}
+
 void reset_stack() {
     vm.stack_top = vm.stack;
     vm.frame_count = 0;
@@ -109,6 +117,7 @@ void init_vm() {
     define_native("strlen", strlen_native, 1);
     define_native("is_string", is_string_native, 1);
     define_native("has_own", has_own, 2);
+    define_native("is_even", is_even_native, 1);
 }
 
 void free_vm() {

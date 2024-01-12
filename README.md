@@ -64,3 +64,9 @@ true
 > print has_own(inst, "field");
 true
 ```
+
+### is_even
+```
+> print is_even(254);
+true
+```
