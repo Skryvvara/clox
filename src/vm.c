@@ -36,7 +36,7 @@ static value_t is_string_native(int arg_count, value_t* args) {
     }
 }
 
-static value_t has_own(int arg_count, value_t* args) {
+static value_t has_own_native(int arg_count, value_t* args) {
     if (IS_INSTANCE(args[0]) && IS_STRING(args[1])) {
         object_instance_t* instance = AS_INSTANCE(args[0]);
         object_string_t* name = AS_STRING(args[1]);
@@ -116,7 +116,7 @@ void init_vm() {
     define_native("clock", clock_native, 0);
     define_native("strlen", strlen_native, 1);
     define_native("is_string", is_string_native, 1);
-    define_native("has_own", has_own, 2);
+    define_native("has_own", has_own_native, 2);
     define_native("is_even", is_even_native, 1);
 }
 
